@@ -1,17 +1,15 @@
 /***
- * 按下+、-后，先判断是否有*、/，有的话，计算整个算式
- * 没有的话，计算当前加减法，
- * 计算加减法：取当前值、弹出operatorNumber中的值、弹出操作符，进行计算；更新输入框；
- * 计算乘除法：取当前值、弹出operatorNumber中的一个值、弹出操作符，进行计算；更新输入框；再次计算
- * 操作符号数组只保留一个加减法、一个乘除法，
- * 输入加减法后，如果当前操作符号数组里只有一个加减法，则计算结果之前的结果，并压入当前加减法
- * 输入乘除法后，如果当前操作符号数组里只有一个加减法，压入当前数、操作符，不计算，等待下一个操作数
- * 压入操作数时，判断操作符是否是乘除法，是的话进行计算
+ * 按下计算符：+/-，立刻计算结果，并将结果放到操作数数组，操作符放入再次操作符，操作数放入再次操作数
+ * 按下等号：立刻计算结果，并将结果放到操作数数组，操作符放入再次操作符
+ * 连按等号：用操作数中的结果，再次操作符，
  ***/
 
 var refreshInputArea;
 var equalSignPressed; //标志是否按下了=号
 var equalValue;
+var caculated = "Ready"; //判断是否已经完成计算
+var operatorSign = [];
+var operatorNumber = [];
 
 window.onload = function() {
     document.getElementById("one").addEventListener("click", function() { pressValue(1) });
@@ -32,8 +30,8 @@ window.onload = function() {
     document.getElementById("percent").addEventListener("click", function() { percent() });
     document.getElementById("equalSign").addEventListener("click", function() { pressEqual() });
 
-    document.getElementById("plus").addEventListener("click", function() { pressPlusOrMinus("+") });
-    document.getElementById("minus").addEventListener("click", function() { pressPlusOrMinus("-") });
+    document.getElementById("plus").addEventListener("click", function() { pressPlus() });
+    document.getElementById("minus").addEventListener("click", function() { pressMinus() });
 
     iniAll();
 
@@ -41,42 +39,43 @@ window.onload = function() {
 
 function iniAll() {
     operatorSign = [];
-    operatorNumber = [0];
-    restoreIinputArea();
+    operatorNumber = [];
+    caculated = "Ready";
 
+
+    restoreInputArea();
     readyToRefresh();
-    equalPressed();
-    
+    equalReleased();
+
     equalValue = 0;
 }
 
 function traceInformation() {
-    console.log("Trace...\n");
+    console.log("Trace...................................\n");
     console.log("Current operator sign:" + operatorSign + "\t Length:" + operatorSign.length);
     console.log("Current operatorNumber:" + operatorNumber + "\t Length:" + operatorNumber.length);
+    console.log("Caculated:" + caculated);
+    console.log("getEqualStatus():" + getEqualStatus());
 }
 
 //triggered by press AC
 function pressClear() {
     //清空输入框
-    restoreIinputArea();
+    restoreInputArea();
     //清空中间过程
 }
 
 //更新inputArea的内容
 function updateInputArea(newValue) {
-    document.getElementById("inputArea").value = newValue;
+    document.getElementById("inputArea").value = String(newValue);
 }
 
 //清空inputArea的内容
-function restoreIinputArea() {
+function restoreInputArea() {
     document.getElementById("inputArea").value = "0";
-    pressValue(0);
+    //pressValue(0);
 }
 
-//获取、设定是否需要刷新输入区域的状态
-//Ready代表需要更新，用在计算结果显示，显示后再输入数字，要刷新整个字符串
-//End代表已经完成更新，再输入数字后，不需要刷新整个字符串
 function readyToRefresh() {
     setRefreshInputArea("Ready");
 }
@@ -94,6 +93,10 @@ function getRefreshStatus() {
 }
 
 function equalPressed() {
+    equalSignPressed = "EqualValueCashed";
+}
+
+function equalPressedAgain() {
     equalSignPressed = "EqualPressed";
 }
 
@@ -123,75 +126,137 @@ function percent() {
 
 
 function pressValue(inputValue) {
-    equalReleased();
+
+    if (getEqualStatus() == "EqualValueCashed") {
+        iniAll();
+    }
 
     var currentValue = String(document.getElementById("inputArea").value);
-    console.log(currentValue, inputValue);
 
+    if (currentValue == "0" && inputValue == 0) {
 
-    if ((inputValue == 0) && (currentValue == "")) {
-        currentValue = inputValue;
-    } else if (currentValue == "0" || getRefreshStatus() == "Ready") {
         endToRefresh();
         currentValue = inputValue;
-    } else {
+
+    } else if (currentValue == "0" || getEqualStatus() == "EqualUNPressed") {
+        endToRefresh();
+        currentValue = inputValue;
+        equalSignPressed = "needMore";
+    } else if (equalSignPressed == "needMore") {
         currentValue = currentValue + String(inputValue);
-
     };
-
-    /***
-    if (operatorNumber.length == 1 && operatorNumber[0] == 0) {
-        operatorNumber.pop();
-        operatorNumber.push(currentValue);
-    }
-***/
 
     updateInputArea(currentValue);
 
+}
+
+function updateOperatorNumber(inputValue) {
+    operatorNumber.push(parseFloat(inputValue));
+    console.log("OperatorNumber updated.");
+}
+
+function updateOperatorSign(inputSign) {
+    var status = "Not pushed.";
+    if (operatorSign.length == 0) {
+        operatorSign.push(inputSign);
+        status = inputSign + "\tpushed.";
+    }
+    console.log(status);
+    return status;
+}
+
+function startToCaculate(tempSign) {
+
+
+
+    if (operatorSign.length > 2 && operatorSign.length < 1) {
+        console.log("operatorSign.length error.")
+    } else {
+        if (operatorSign.length == 0) {
+            updateOperatorSign(tempSign);
+        } else {
+
+            for (var tempIndex = 0; tempIndex < operatorSign.length; tempIndex++) {
+                var value1, value2 = 0;
+                var operator = "";
+                console.log("operatorNumber:" + operatorNumber);
+                value2 = parseFloat(operatorNumber.pop());
+                value1 = parseFloat(operatorNumber.pop());
+                operator = operatorSign.pop();
+
+                var result = caculate(value1, value2, operator);
+
+                updateOperatorNumber(result);
+                updateInputArea(result);
+                console.log("Begin to caculat:" + result);
+
+            }
+
+            updateOperatorSign(tempSign);
+            traceInformation();
+
+            equalReleased();
+        }
+    }
 
 }
 
-//triggered by press +,-
-function pressPlusOrMinus(operatorPlusOrMinus) {
-    var sum;
-
-    equalReleased();
-   
-    console.log("pressPlusOrMinus" + operatorPlusOrMinus);
-    var currentValue = parseFloat(document.getElementById("inputArea").value);
-    
-    
-    if (operatorSign.length == 0) {
-        console.log("Operator sign = 0:");
-        operatorSign.push(operatorPlusOrMinus);
-        console.log("Operator sign pushed:" + operatorSign);
-    } else {
-        
-        tempOperator = operatorSign.pop();
-        
-        switch (tempOperator) {
-            case "+":
-            sum = parseFloat(operatorNumber.pop()) + currentValue;
+function caculate(value1, value2, operator) {
+    var result = "No result.";
+    console.log("value1:" + value1 + "\tvalue2:" + value2 + "\toperator:" + operator);
+    switch (operator) {
+        case "+":
+            console.log("Precessing plus:");
+            result = value1 + value2;
             break;
-            case "-":
-            sum = parseFloat(operatorNumber.pop()) - currentValue;
+        case "-":
+            result = value1 - value2;
             break;
-        };
-        
-        operatorNumber.push(sum);
-        operatorSign.push(operatorPlusOrMinus);
-        updateInputArea(sum);
-
-        console.log("Current operator popped from sign:" + tempOperator + "\n");
-
+        case "*":
+            result = value1 * value2;
+            break;
+        case "/":
+            if (value2 == 0) {} else {
+                alert("Devide by zero.")
+                result = value1 / value2;
+            }
+            break;
     };
 
-    readyToRefresh();
+    return result;
+}
 
-    traceInformation();
+//判断是否当初始化后，直接按下操作符号，如果是的话，要在操作数里补一个操作数：0
+function patchAZero() {
+    if (operatorNumber.length == 0) {
+        operatorNumber.push(0);
+        return "Zero Patched."
+    } else { return "Nothin Patched." };
 
 }
 
+
+function pressOperator(tempOperator) {
+    if (getEqualStatus() == "EqualValueCashed") {
+        equalReleased();
+    } else {
+        if (getEqualStatus() == "EqualUNPressed") {
+            readyToRefresh();
+
+            updateOperatorNumber(document.getElementById("inputArea").value);
+
+            startToCaculate(tempOperator);
+        }
+    }
+}
+
+function pressPlus() {
+    pressOperator("+");
+}
+
+function pressMinus() {
+
+}
 
 function pressEqual() {
 
@@ -201,23 +266,72 @@ function pressEqual() {
         equalPressed();
     }
 
+    if (getEqualStatus() == "EqualValueCashed") {
 
-    if (operatorSign.length == 0) {
+        if (operatorSign.length == 0) {
 
-    } else {
-        tempOperator = operatorSign[operatorSign.length - 1];
+        } else {
+            tempOperator = operatorSign[operatorSign.length - 1];
 
-        switch (tempOperator) {
-            case "+":
-                var sum = parseFloat(operatorNumber.pop()) + equalValue;
+            var result = caculate(operatorNumber.pop(), equalValue, tempOperator);
 
-                operatorNumber.push(sum);
-                updateInputArea(sum);
-
-                console.log("Current operator popped from sign:" + tempOperator + "\n");
-                break;
+            updateOperatorNumber(result);
+            updateInputArea(result);
+            //equalReleased();
+            console.log("Current operator popped from sign:" + tempOperator + "\n");
         }
     }
+
+
+}
+
+
+
+
+
+
+
+
+//triggered by press +,-
+function pressPlusOrMinus(operatorPlusOrMinus) {
+    console.log("Plus or Minus");
+    /***
+        equalReleased();
+
+        
+         var currentValue = parseFloat(document.getElementById("inputArea").value);
+         
+         
+         if (operatorSign.length == 0) {
+             console.log("Operator sign = 0:");
+             operatorSign.push(operatorPlusOrMinus);
+             console.log("Operator sign pushed:" + operatorSign);
+            } else {
+                
+                tempOperator = operatorSign.pop();
+                
+                switch (tempOperator) {
+                    case "+":
+                    sum = parseFloat(operatorNumber.pop()) + currentValue;
+                    break;
+                    case "-":
+                    sum = parseFloat(operatorNumber.pop()) - currentValue;
+                    break;
+                };
+                
+                operatorNumber.push(sum);
+                operatorSign.push(operatorPlusOrMinus);
+                updateInputArea(sum);
+                
+                console.log("Current operator popped from sign:" + tempOperator + "\n");
+                
+            };
+            
+          
+        readyToRefresh();
+
+        traceInformation();
+      ***/
 }
 
 
