@@ -1,13 +1,23 @@
 /***
- * 按下计算符：+/-，立刻计算结果，并将结果放到操作数数组，操作符放入再次操作符，操作数放入再次操作数
- * 按下等号：立刻计算结果，并将结果放到操作数数组，操作符放入再次操作符
- * 连按等号：用操作数中的结果，再次操作符，
+ * 1，+；1，+，2；1，+，2，+
+ *等待操作数1：输入操作数1；按下操作符1，判断是否可计算（肯定不可计算），如不可计算，等待操作数2；如可计算，计算结果，结果替换操作数1，等待操作数2；
+ *等待操作数2：输入操作数2，按下操作符2，判断是否可计算；如不可计算（操作符2是乘除法），保存操作符2，等待操作数3；如可计算（操作符2是加减法），计算整个结果，结果替换操作数1，将操作符2替换操作符1，等待操作数2；
+ *等待操作数3：输入操作数3，按下操作符3，如果操作符3是乘除法，用操作符3计算操作数2、3，将结果替换操作数2，将操作符3替换操作符2，等待操作数3；如操作符3是加减法，计算整个结果，结果替换操作数1，将操作符2替换操作符1，等待操作数2；
+ * 
+ *等待操作数1：按下操作符，将0作为操作数1，保存操作符1，等待操作数2；
+ *等待操作数2：按下操作符，将新的操作符替换上次操作符，等待操作数2；
+ *
+ *等待操作符数3：按下操作符，将新的操作符替换上次操作符，等待操作数3；
+ * 
+ *按下操作符：保存到临时操作符，保存输入框内容为临时操作数
+ *按下等号：第一次按下等号，计算结果，清空操作数组，将结果保存到操作数1，清空操作符号
+ *持续按下等号： 将操作数，临时操作符，临时操作数进行计算；计算结果保存到操作数1；
  ***/
 
 var refreshInputArea;
 var equalSignPressed; //标志是否按下了=号
 var equalValue;
-var caculated = "Ready"; //判断是否已经完成计算
+var flagReflash = "toReflash"; //判断是否已经完成计算，需要更新：toReflash；需要追加：toAppend
 var operatorSign = [];
 var operatorNumber = [];
 
@@ -38,25 +48,17 @@ window.onload = function() {
 }
 
 function iniAll() {
-    operatorSign = [];
-    operatorNumber = [];
-    caculated = "Ready";
+    operatorSign = []; //清空操作符数组
+    operatorNumber = []; //清空操作数数组
+    flagReflash = "toReflash" //刷新标志设定为需要刷新
 
 
     restoreInputArea();
-    readyToRefresh();
     equalReleased();
 
     equalValue = 0;
 }
 
-function traceInformation() {
-    console.log("Trace...................................\n");
-    console.log("Current operator sign:" + operatorSign + "\t Length:" + operatorSign.length);
-    console.log("Current operatorNumber:" + operatorNumber + "\t Length:" + operatorNumber.length);
-    console.log("Caculated:" + caculated);
-    console.log("getEqualStatus():" + getEqualStatus());
-}
 
 //triggered by press AC
 function pressClear() {
@@ -65,32 +67,75 @@ function pressClear() {
     //清空中间过程
 }
 
-//更新inputArea的内容
-function updateInputArea(newValue) {
+//清空输入框的内容
+//将输入框更新标志设定为：需要更新 toReflash
+function restoreInputArea() {
+    document.getElementById("inputArea").value = "0";
+    setFlahReflesh("toReflash");
+}
+
+//设定输入框的内容，当结果更新后，需要设定输入框的内容
+function setInputArea(newValue) {
     document.getElementById("inputArea").value = String(newValue);
 }
 
-//清空inputArea的内容
-function restoreInputArea() {
-    document.getElementById("inputArea").value = "0";
-    //pressValue(0);
+function setFlahReflesh(tempFlagReflash) {
+    flagReflash = tempFlagReflash
 }
 
-function readyToRefresh() {
-    setRefreshInputArea("Ready");
+function getFlahReflesh() {
+    return (flagReflash)
 }
 
-function endToRefresh() {
-    setRefreshInputArea("End");
+//当按下数字时执行
+function pressValue(inputValue) {
+
+    inputValue = String(inputValue);
+
+    //判断是否需要立刻进行计算！！！
+
+    //判断输入框是否需要刷新
+    if (getFlahReflesh() == "toReflash") {
+        if (inputValue == "0") {
+            //当需要刷新时，按下了0，需要判断此时是否为0
+            if (document.getElementById("inputArea").value == "0") {
+                //当需要刷新时，按下了0，同时此时输入框已经是0了，那么什么事情也不做
+                console.log("0 pressed when input area already be 0;")
+            }
+        } else {
+            //当需要刷新时，按下了非0数字，那么，将输入框设定为0，同时将输入框更新标志设定为：需要追加 toAppend            
+            setInputArea(inputValue);
+            setFlahReflesh("toAppend");
+            console.log("0 pressed when input area need to be appended;")
+        }
+    } else {
+        //当输入框更新标志为：需要追加 toAppend 时，在当前输入框的最后，追加字符
+        var currentValue = String(document.getElementById("inputArea").value);
+        currentValue = currentValue + inputValue;
+        setInputArea(currentValue);
+    }
+
 }
 
-function setRefreshInputArea(value) {
-    refreshInputArea = value;
+//当按下操作符号时执行
+function pressOperator(tempOperator) {
+
+    //判断是否存在已按下乘除法的标志，如果存在已按下乘除法的标志，代表在乘法后面直接按下了加减法，此时，应该：
+    //取消最近的一次乘除法；计算整个算式；将操作结果设定为第一个操作数；将加减法设定为第一个操作符号；将结果更新到输入框；
+    //将输入框刷新标志设定为等待新操作数
+    if (getEqualStatus() == "EqualValueCashed") {
+        equalReleased();
+    } else {
+        if (getEqualStatus() == "EqualUNPressed") {
+            readyToRefresh();
+
+            updateOperatorNumber(document.getElementById("inputArea").value);
+
+            startToCaculate(tempOperator);
+        }
+    }
 }
 
-function getRefreshStatus() {
-    return (refreshInputArea);
-}
 
 function equalPressed() {
     equalSignPressed = "EqualValueCashed";
@@ -125,30 +170,7 @@ function percent() {
 }
 
 
-function pressValue(inputValue) {
 
-    if (getEqualStatus() == "EqualValueCashed") {
-        iniAll();
-    }
-
-    var currentValue = String(document.getElementById("inputArea").value);
-
-    if (currentValue == "0" && inputValue == 0) {
-
-        endToRefresh();
-        currentValue = inputValue;
-
-    } else if (currentValue == "0" || getEqualStatus() == "EqualUNPressed") {
-        endToRefresh();
-        currentValue = inputValue;
-        equalSignPressed = "needMore";
-    } else if (equalSignPressed == "needMore") {
-        currentValue = currentValue + String(inputValue);
-    };
-
-    updateInputArea(currentValue);
-
-}
 
 function updateOperatorNumber(inputValue) {
     operatorNumber.push(parseFloat(inputValue));
@@ -166,8 +188,6 @@ function updateOperatorSign(inputSign) {
 }
 
 function startToCaculate(tempSign) {
-
-
 
     if (operatorSign.length > 2 && operatorSign.length < 1) {
         console.log("operatorSign.length error.")
@@ -187,7 +207,7 @@ function startToCaculate(tempSign) {
                 var result = caculate(value1, value2, operator);
 
                 updateOperatorNumber(result);
-                updateInputArea(result);
+                setInputArea(result);
                 console.log("Begin to caculat:" + result);
 
             }
@@ -201,30 +221,7 @@ function startToCaculate(tempSign) {
 
 }
 
-function caculate(value1, value2, operator) {
-    var result = "No result.";
-    console.log("value1:" + value1 + "\tvalue2:" + value2 + "\toperator:" + operator);
-    switch (operator) {
-        case "+":
-            console.log("Precessing plus:");
-            result = value1 + value2;
-            break;
-        case "-":
-            result = value1 - value2;
-            break;
-        case "*":
-            result = value1 * value2;
-            break;
-        case "/":
-            if (value2 == 0) {} else {
-                alert("Devide by zero.")
-                result = value1 / value2;
-            }
-            break;
-    };
 
-    return result;
-}
 
 //判断是否当初始化后，直接按下操作符号，如果是的话，要在操作数里补一个操作数：0
 function patchAZero() {
@@ -236,19 +233,6 @@ function patchAZero() {
 }
 
 
-function pressOperator(tempOperator) {
-    if (getEqualStatus() == "EqualValueCashed") {
-        equalReleased();
-    } else {
-        if (getEqualStatus() == "EqualUNPressed") {
-            readyToRefresh();
-
-            updateOperatorNumber(document.getElementById("inputArea").value);
-
-            startToCaculate(tempOperator);
-        }
-    }
-}
 
 function pressPlus() {
     pressOperator("+");
@@ -276,7 +260,7 @@ function pressEqual() {
             var result = caculate(operatorNumber.pop(), equalValue, tempOperator);
 
             updateOperatorNumber(result);
-            updateInputArea(result);
+            setInputArea(result);
             //equalReleased();
             console.log("Current operator popped from sign:" + tempOperator + "\n");
         }
@@ -284,6 +268,77 @@ function pressEqual() {
 
 
 }
+
+
+
+
+
+function caculate(value1, value2, operator) {
+    var result = "No result.";
+    console.log("value1:" + value1 + "\tvalue2:" + value2 + "\toperator:" + operator);
+    switch (operator) {
+        case "+":
+            console.log("Precessing plus:");
+            result = value1 + value2;
+            break;
+        case "-":
+            result = value1 - value2;
+            break;
+        case "*":
+            result = value1 * value2;
+            break;
+        case "/":
+            if (value2 == 0) {} else {
+                alert("Devide by zero.")
+                result = value1 / value2;
+            }
+            break;
+    };
+
+    return result;
+}
+
+
+function traceInformation() {
+    console.log("Trace...................................\n");
+    console.log("Current operator sign:" + operatorSign + "\t Length:" + operatorSign.length);
+    console.log("Current operatorNumber:" + operatorNumber + "\t Length:" + operatorNumber.length);
+    console.log("flagReflash:" + flagReflash);
+    console.log("getEqualStatus():" + getEqualStatus());
+}
+
+
+//==============================
+
+
+
+/***
+function readyToRefresh() {
+    setRefreshInputArea("Ready");
+}
+
+function endToRefresh() {
+    setRefreshInputArea("End");
+}
+
+function setRefreshInputArea(value) {
+    refreshInputArea = value;
+}
+
+function getRefreshStatus() {
+    return (refreshInputArea);
+}
+***/
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -321,7 +376,7 @@ function pressPlusOrMinus(operatorPlusOrMinus) {
                 
                 operatorNumber.push(sum);
                 operatorSign.push(operatorPlusOrMinus);
-                updateInputArea(sum);
+                setInputArea(sum);
                 
                 console.log("Current operator popped from sign:" + tempOperator + "\n");
                 
@@ -433,7 +488,7 @@ function updatePlus(sign) {
 
         var result = plus(operator1, operator2);
         operatorNumber.push(result);
-        updateInputArea(result);
+        setInputArea(result);
     }
 }
 
